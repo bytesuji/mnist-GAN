@@ -111,30 +111,28 @@ class MNISTGAN(object):
                          optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
 
     def train_composite(self, epochs=100, batch_size=256):
+        losses = []
         for i in range(epochs):
             x = self.generator.generate_latent_element(batch_size)
             y = np.ones((batch_size, 1))
-            self.gan.train_on_batch(x, y)
+            losses.append(self.model.train_on_batch(x, y)[0])
+
+        return losses
 
     def train(self, data, epochs=100, batch_size=256):
         bpe = int(data.shape[0] / batch_size)
         half_batch = int(batch_size / 2) ## discriminator takes half real, half fake
 
         for i in range(epochs):
+            ## data for training discriminator
             x_real, y_real = self.discriminator.create_real_samples(data, half_batch)
             x_fake, y_fake = self.generator.generate(half_batch)
-
-            ## data for training discriminator
             x_disc, y_disc = np.vstack((x_real, x_fake)), np.vstack((y_real, y_fake))
 
-            ## data for updating composite GAN
-            x_gan = self.generator.generate_latent_elements(batch_size)
-            y_gan = np.ones((batch_size, 1))
-
             discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
-            gan_loss     = self.model.train_on_batch(x_gan, y_gan)
+            gan_loss     = self.train_composite(epochs=1, batch_size=batch_size)[0]
 
-            print("Epoch {}: Gen Loss {} / Disc Loss {}".format(
+            print("Epoch {}: GAN Loss {} / Disc Loss {}".format(
                    i, gan_loss, discrim_loss
             ))
 
