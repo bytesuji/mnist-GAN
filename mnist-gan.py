@@ -81,7 +81,7 @@ class MNISTGenerator(object):
             self.latent_space_dim)
 
     def generate(self, n):
-        latent = self.generate_latent_elements(n)
+        latent = self.create_latent_elements(n)
         x = self.model.predict(latent)
         y = np.zeros((n, 1)) ## speed up backprop by claiming gen'd images are real
 
@@ -116,7 +116,7 @@ class MNISTGAN(object):
     def train_composite(self, epochs=100, batch_size=256):
         losses = []
         for i in range(epochs):
-            x = self.generator.generate_latent_elements(batch_size)
+            x = self.generator.create_latent_elements(batch_size)
             y = np.ones((batch_size, 1))
             losses.append(self.model.train_on_batch(x, y))
 
@@ -137,7 +137,7 @@ class MNISTGAN(object):
                 discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
                 gan_loss = self.train_composite(epochs=1, batch_size=batch_size)[0]
 
-                print("Batch {}: GAN Loss {0.3f} / Discrim Loss {0.3f}".format(
+                print("Batch {0:d}: GAN Loss {1:0.3f} / Discrim Loss {2:0.3f}".format(
                        i, gan_loss, discrim_loss
                 ))
 
