@@ -91,14 +91,20 @@ class MNISTGenerator(object):
 
 
 class MNISTGAN(object):
+    def create_composite_model(self, gen, disc):
+        disc.trainable = False
+        model = K.models.Sequential()
+        model.add(gen)
+        model.add(disc)
+        model.compile(loss='binary_crossentropy',
+                         optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
+        return model
+
     def __init__(self, g_latent_space_dim=100, g_init_dim=(7, 7, 128),
                  d_input_shape=(28, 28, 1), print_subnetwork_summary=False):
         self.discriminator = MNISTDiscriminator(input_shape=d_input_shape)
         self.generator = MNISTGenerator(latent_space_dim=g_latent_space_dim,
                                                 init_dim=g_init_dim)
-
-        self._non_train_discrim = copy.deepcopy(self.discriminator)
-        self._non_train_discrim.model.trainable = False
 
         if print_subnetwork_summary:
             print("--- GAN Discriminator ---")
@@ -106,12 +112,10 @@ class MNISTGAN(object):
             print("--- GAN Generator ---")
             self.generator.summary()
 
-        self.model = K.models.Sequential()
-        self.model.add(self.generator.model)
-        self.model.add(self._non_train_discrim.model)
+        self.model = self.create_composite_model(self.generator.model,
+            self.discriminator.model)
 
-        self.model.compile(loss='binary_crossentropy',
-                         optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
+        assert(self.discriminator.model.trainable)
 
     def train_composite(self, epochs=100, batch_size=256):
         losses = []
