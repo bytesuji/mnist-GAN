@@ -86,14 +86,20 @@ class MNISTGenerator(object):
 
 
 class MNISTGAN(object):
-    def __init__(self):
+    def __init__(self, print_subnetwork_summary=False):
         self.discriminator = MNISTDiscriminator()
         self.discriminator.model.trainable = False
         self.generator = MNISTGenerator()
 
+        if print_subnetwork_summary:
+            print("--- GAN Discriminator ---")
+            self.discriminator.summary()
+            print("--- GAN Generator ---")
+            self.generator.summary()
+
         self.model = K.models.Sequential()
-        self.model.add(self.discriminator.model)
         self.model.add(self.generator.model)
+        self.model.add(self.discriminator.model)
 
         self.model.compile(loss='binary_crossentropy',
                          optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
