@@ -113,7 +113,7 @@ class MNISTGAN(object):
             self.generator.summary()
 
         self.model = self.create_composite_model(self.generator.model,
-            self.discriminator.model)
+            copy.deepcopy(self.discriminator.model))
 
         assert(self.discriminator.model.trainable)
 
@@ -142,7 +142,7 @@ class MNISTGAN(object):
                 gan_loss = self.train_composite(epochs=1, batch_size=batch_size)[0]
 
                 print("Batch {0:d}: GAN Loss {1:0.3f} / Discrim Loss {2:0.3f}".format(
-                       i, gan_loss, discrim_loss
+                       j, gan_loss, discrim_loss
                 ))
 
     def summary(self): self.model.summary()
