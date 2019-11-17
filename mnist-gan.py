@@ -33,7 +33,7 @@ class MNISTDiscriminator(object):
 
         return x, y
 
-    def create_fake_samples(self, n):
+    def create_null_samples(self, n):
         x = np.random.rand(28 * 28 * n).reshape((n, 28, 28, 1))
         y = np.zeros((n, 1))
 
@@ -43,13 +43,16 @@ class MNISTDiscriminator(object):
         print("--- TRAIN DISCRIMINATOR ---")
         for i in range(epochs):
             x_real, y_real = self.create_real_samples(data, int(batch_size / 2))
-            x_fake, y_fake = self.create_fake_samples(int(batch_size / 2))
+            x_fake, y_fake = self.create_null_samples(int(batch_size / 2))
 
             real_acc = self.model.train_on_batch(x_real, y_real)[1]
             fake_acc = self.model.train_on_batch(x_fake, y_fake)[1]
             avg_acc = (real_acc + fake_acc) / 2
 
             print("epoch {} accuracy {}%".format(i, avg_acc*100))
+
+    def train_on_batch(self, x, y,):
+        return self.model.train_on_batch(x, y)[0] ## return loss
 
     def summary(self): self.model.summary()
 
@@ -73,7 +76,8 @@ class MNISTGenerator(object):
         self.model = K.models.Sequential(gen_layers)
 
     def generate_latent_elements(self, n):
-        return np.random.randn(self.latent_space_dim * n).reshape(n, latent_space_dim)
+        return np.random.randn(self.latent_space_dim * n).reshape(n,
+            self.latent_space_dim)
 
     def generate(self, n):
         latent = self.generate_latent_elements(n)
@@ -86,10 +90,12 @@ class MNISTGenerator(object):
 
 
 class MNISTGAN(object):
-    def __init__(self, print_subnetwork_summary=False):
-        self.discriminator = MNISTDiscriminator()
+    def __init__(self, g_latent_space_dim=100, g_init_dim=(7, 7, 128),
+                 d_input_shape=(28, 28, 1), print_subnetwork_summary=False):
+        self.discriminator = MNISTDiscriminator(input_shape=d_input_shape)
+        self.generator = MNISTGenerator(latent_space_dim=g_latent_space_dim,
+                                                init_dim=g_init_dim)
         self.discriminator.model.trainable = False
-        self.generator = MNISTGenerator()
 
         if print_subnetwork_summary:
             print("--- GAN Discriminator ---")
@@ -104,17 +110,44 @@ class MNISTGAN(object):
         self.model.compile(loss='binary_crossentropy',
                          optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
 
-    def train(self, epochs=100, batch_size=256):
+    def train_composite(self, epochs=100, batch_size=256):
         for i in range(epochs):
             x = self.generator.generate_latent_element(batch_size)
             y = np.ones((batch_size, 1))
             self.gan.train_on_batch(x, y)
 
+    def train(self, data, epochs=100, batch_size=256):
+        bpe = int(data.shape[0] / batch_size)
+        half_batch = int(batch_size / 2) ## discriminator takes half real, half fake
+
+        for i in range(epochs):
+            x_real, y_real = self.discriminator.create_real_samples(data, half_batch)
+            x_fake, y_fake = self.generator.generate(half_batch)
+
+            ## data for training discriminator
+            x_disc, y_disc = np.vstack((x_real, x_fake)), np.vstack((y_real, y_fake))
+
+            ## data for updating composite GAN
+            x_gan = self.generator.generate_latent_elements(batch_size)
+            y_gan = np.ones((batch_size, 1))
+
+            discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
+            gan_loss     = self.model.train_on_batch(x_gan, y_gan)
+
+            print("Epoch {}: Gen Loss {} / Disc Loss {}".format(
+                   i, gan_loss, discrim_loss
+            ))
+
     def summary(self): self.model.summary()
 
 def main():
+    (x_mnist, _), (_, _) = mnist.load_data()
+    real_mnist = np.expand_dims(x_mnist, axis=-1)
+    real_mnist = real_mnist.astype('float32') / 255.0
+
     gan = MNISTGAN()
     gan.summary()
+    gan.train(real_mnist)
 
 if __name__ == '__main__':
     main()
