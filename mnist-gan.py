@@ -1,3 +1,4 @@
+import copy
 import keras as K
 import numpy as np
 from keras.datasets import mnist
@@ -27,7 +28,7 @@ class MNISTDiscriminator(object):
                            optimizer=K.optimizers.Adam(lr=0.002, beta_1=0.5),
                            metrics=['accuracy'])
 
-    def create_real_samples(self, data, n):
+    def select_real_samples(self, data, n):
         x = data[np.random.randint(0, data.shape[0], n)]
         y = np.ones((n, 1))
 
@@ -42,7 +43,7 @@ class MNISTDiscriminator(object):
     def train(self, data, epochs=128, batch_size=256):
         print("--- TRAIN DISCRIMINATOR ---")
         for i in range(epochs):
-            x_real, y_real = self.create_real_samples(data, int(batch_size / 2))
+            x_real, y_real = self.select_real_samples(data, int(batch_size / 2))
             x_fake, y_fake = self.create_null_samples(int(batch_size / 2))
 
             real_acc = self.model.train_on_batch(x_real, y_real)[1]
@@ -75,7 +76,7 @@ class MNISTGenerator(object):
 
         self.model = K.models.Sequential(gen_layers)
 
-    def generate_latent_elements(self, n):
+    def create_latent_elements(self, n):
         return np.random.randn(self.latent_space_dim * n).reshape(n,
             self.latent_space_dim)
 
@@ -95,7 +96,9 @@ class MNISTGAN(object):
         self.discriminator = MNISTDiscriminator(input_shape=d_input_shape)
         self.generator = MNISTGenerator(latent_space_dim=g_latent_space_dim,
                                                 init_dim=g_init_dim)
-        self.discriminator.model.trainable = False
+
+        self._non_train_discrim = copy.deepcopy(self.discriminator)
+        self._non_train_discrim.model.trainable = False
 
         if print_subnetwork_summary:
             print("--- GAN Discriminator ---")
@@ -105,7 +108,7 @@ class MNISTGAN(object):
 
         self.model = K.models.Sequential()
         self.model.add(self.generator.model)
-        self.model.add(self.discriminator.model)
+        self.model.add(self._non_train_discrim.model)
 
         self.model.compile(loss='binary_crossentropy',
                          optimizer=K.optimizers.Adam(lr=0.0002, beta_1=0.5))
@@ -124,17 +127,19 @@ class MNISTGAN(object):
         half_batch = int(batch_size / 2) ## discriminator takes half real, half fake
 
         for i in range(epochs):
-            ## data for training discriminator
-            x_real, y_real = self.discriminator.create_real_samples(data, half_batch)
-            x_fake, y_fake = self.generator.generate(half_batch)
-            x_disc, y_disc = np.vstack((x_real, x_fake)), np.vstack((y_real, y_fake))
+            print("--- Epoch {} ---".format(i))
+            for j in range(bpe):
+                ## data for training discriminator
+                x_real, y_real = self.discriminator.select_real_samples(data, half_batch)
+                x_fake, y_fake = self.generator.generate(half_batch)
+                x_disc, y_disc = np.vstack((x_real, x_fake)), np.vstack((y_real, y_fake))
 
-            discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
-            gan_loss = self.train_composite(epochs=1, batch_size=batch_size)[0]
+                discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
+                gan_loss = self.train_composite(epochs=1, batch_size=batch_size)[0]
 
-            print("Epoch {}: GAN Loss {} / Disc Loss {}".format(
-                   i, gan_loss, discrim_loss
-            ))
+                print("Batch {}: GAN Loss {0.3f} / Discrim Loss {0.3f}".format(
+                       i, gan_loss, discrim_loss
+                ))
 
     def summary(self): self.model.summary()
 
