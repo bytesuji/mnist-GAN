@@ -115,7 +115,7 @@ class MNISTGAN(object):
         for i in range(epochs):
             x = self.generator.generate_latent_elements(batch_size)
             y = np.ones((batch_size, 1))
-            losses.append(self.model.train_on_batch(x, y)[0])
+            losses.append(self.model.train_on_batch(x, y))
 
         return losses
 
@@ -130,7 +130,7 @@ class MNISTGAN(object):
             x_disc, y_disc = np.vstack((x_real, x_fake)), np.vstack((y_real, y_fake))
 
             discrim_loss = self.discriminator.train_on_batch(x_disc, y_disc)
-            gan_loss     = self.train_composite(epochs=1, batch_size=batch_size)[0]
+            gan_loss = self.train_composite(epochs=1, batch_size=batch_size)[0]
 
             print("Epoch {}: GAN Loss {} / Disc Loss {}".format(
                    i, gan_loss, discrim_loss
