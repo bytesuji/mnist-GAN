@@ -113,7 +113,7 @@ class MNISTGAN(object):
     def train_composite(self, epochs=100, batch_size=256):
         losses = []
         for i in range(epochs):
-            x = self.generator.generate_latent_element(batch_size)
+            x = self.generator.generate_latent_elements(batch_size)
             y = np.ones((batch_size, 1))
             losses.append(self.model.train_on_batch(x, y)[0])
 
